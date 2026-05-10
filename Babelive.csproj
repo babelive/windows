@@ -10,6 +10,14 @@
     <RootNamespace>Babelive</RootNamespace>
     <AssemblyName>Babelive</AssemblyName>
     <ApplicationIcon></ApplicationIcon>
+    <!-- Tell `dotnet restore` to fetch win-x64 NuGet assets too, so a
+         later publish step (with no-restore flag) that sets
+         RuntimeIdentifier=win-x64 via the conditional Release group
+         below can resolve them from the existing project.assets.json
+         instead of erroring with NETSDK1047. The plural Identifiers
+         here is for restore; the singular Identifier in the Release
+         group is the one actually used at publish time. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <!-- Release-publish defaults: produce ONE self-contained, compressed
