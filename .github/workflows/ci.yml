@@ -1,0 +1,72 @@
+name: CI
+
+# Runs on every push and PR — catches "you broke the build" before users
+# notice. Only verifies that compile + publish succeed; doesn't ship
+# anything anywhere (that's release.yml's job).
+on:
+  push:
+    branches: [main, master]
+    # Skip CI on tag pushes — release.yml handles those and would
+    # double-build otherwise.
+    tags-ignore: ['**']
+  pull_request:
+    branches: [main, master]
+
+# Cancel any in-flight runs for the same branch when a new push lands.
+# Saves runner minutes; you only ever care about the latest commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Babelive.csproj
+
+      - name: Build (Debug)
+        # Catches normal compile errors and any code that breaks under
+        # the default config developers actually run locally.
+        run: dotnet build Babelive.csproj -c Debug --no-restore
+
+      - name: Publish (Release single-file)
+        # Verifies the release-build path too — it triggers different
+        # MSBuild targets (single-file packaging, native bundling, etc.)
+        # and used to silently break in the past when csproj changes
+        # didn't account for trimmer/single-file analyzers. Keeping this
+        # in CI means release.yml on a real tag will never surprise us.
+        run: dotnet publish Babelive.csproj -c Release --no-restore
+
+      - name: Sanity-check the published exe exists
+        shell: pwsh
+        run: |
+          $exe = "bin/Release/net8.0-windows/win-x64/publish/Babelive.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "Publish output missing: $exe"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+          Write-Host "OK — Babelive.exe is $size MB"
+
+      - name: Upload exe as build artifact
+        # Every push gets the exe attached to the run so you (or anyone
+        # else) can download and try the latest commit without having to
+        # build locally. Names include the short commit SHA so multiple
+        # parallel runs (e.g. several PRs) don't collide.
+        uses: actions/upload-artifact@v7
+        with:
+          name: Babelive-${{ github.ref_name }}-${{ github.sha }}
+          path: bin/Release/net8.0-windows/win-x64/publish/Babelive.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0   # exe is already compressed (single-file)

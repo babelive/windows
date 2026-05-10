@@ -1,0 +1,71 @@
+name: Release Build
+
+# Triggers:
+#   release.published — fires when you click "Publish release" in the
+#                       GitHub UI (or `gh release create v1.0.0`); this is
+#                       the normal path that uploads the exe as an asset.
+#   workflow_dispatch — manual run from the Actions tab; produces the exe
+#                       as a downloadable artifact for testing.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # MUST be Windows — the project is WPF (Windows-only) and produces a
+    # win-x64 self-contained exe via the Release-publish settings baked
+    # into Babelive.csproj.
+    runs-on: windows-latest
+
+    permissions:
+      # Required so softprops/action-gh-release can attach the exe to
+      # the release. Default GITHUB_TOKEN with contents:write is enough;
+      # no extra PAT needed.
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Babelive.csproj
+
+      - name: Publish single-file exe
+        # Release config in csproj already pins:
+        #   PublishSingleFile, SelfContained, RuntimeIdentifier=win-x64,
+        #   IncludeAllContentForSelfExtract, EnableCompressionInSingleFile,
+        #   DebugType=none. So `-c Release` is the only flag needed.
+        run: dotnet publish Babelive.csproj -c Release --no-restore
+
+      - name: Rename exe with version tag
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.release.tag_name }}"
+          $src = "bin/Release/net8.0-windows/win-x64/publish/Babelive.exe"
+          $dst = "Babelive-$version.exe"
+          Copy-Item $src $dst
+          $size = [math]::Round((Get-Item $dst).Length / 1MB, 1)
+          Write-Host "Built $dst ($size MB)"
+
+      - name: Attach exe to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: Babelive-${{ github.event.release.tag_name }}.exe
+          fail_on_unmatched_files: true
+
+      - name: Upload as artifact (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Babelive-exe
+          path: bin/Release/net8.0-windows/win-x64/publish/Babelive.exe
+          if-no-files-found: error
+          retention-days: 14

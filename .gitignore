@@ -1,0 +1,69 @@
+# ===== Build output =====
+bin/
+obj/
+publish/
+out/
+*.dll
+*.exe
+*.pdb
+
+# ===== Visual Studio / Rider / VS Code =====
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+*.userosscache
+*.sln.docstates
+*.vsidx
+*.lastbuildstate
+
+# ===== ReSharper / dotCover =====
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.coverage
+*.coveragexml
+
+# ===== NuGet =====
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+**/packages/
+project.lock.json
+
+# ===== Test results =====
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+
+# ===== Secrets — NEVER commit these =====
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets.json
+*.pfx
+*.snk
+
+# ===== Logs / temp =====
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# ===== OS junk =====
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+
+# ===== Misc generated =====
+*.g.cs
+*.g.i.cs
+*.AssemblyInfo.cs
+GlobalUsings.g.cs

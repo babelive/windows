@@ -1,0 +1,244 @@
+﻿<Window x:Class="Babelive.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Babelive — Realtime Audio Translator"
+        Width="900" Height="640" MinWidth="700" MinHeight="460"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        FontFamily="Microsoft YaHei UI, Segoe UI, PingFang SC"
+        FontSize="13"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <!-- WindowChrome lets the borderless transparent window keep the OS
+         drag/resize/snap behaviors. CaptionHeight=36 → top 36 px is the
+         title-bar drag area; ResizeBorderThickness=6 → invisible 6 px
+         resize border on all sides; GlassFrameThickness=0 → no DWM
+         glass overlay (required when AllowsTransparency=True). -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome
+            CaptionHeight="36"
+            CornerRadius="0"
+            GlassFrameThickness="0"
+            ResizeBorderThickness="6"
+            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+
+    <!-- ===== Outer rounded shell ===== -->
+    <Border Background="{StaticResource WindowBg}"
+            BorderBrush="{StaticResource WindowBorder}"
+            BorderThickness="1"
+            CornerRadius="12"
+            SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ===== Title bar ===== -->
+            <Grid Grid.Row="0" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Babelive"
+                           FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="20,0,0,0"
+                           Foreground="{StaticResource TextSecondary}"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Style="{StaticResource CaptionButton}" Content="—"
+                            Click="MinBtn_Click"
+                            ToolTip="Minimize"/>
+                    <Button Style="{StaticResource CloseCaptionButton}" Content="✕"
+                            Click="CloseBtn_Click"
+                            ToolTip="Close (overlay stays in tray)"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== Main content ===== -->
+            <Grid Grid.Row="1" Margin="24,4,24,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Top control panel: 3 columns (label | combo+refresh stack | start/clear stack) -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Translate to" Grid.Row="0" Grid.Column="0"
+                               Style="{StaticResource LabelText}" Margin="0,8"/>
+                    <ComboBox x:Name="LangCombo" Grid.Row="0" Grid.Column="1"
+                              Style="{StaticResource ModernCombo}"
+                              Margin="6,4"/>
+
+                    <TextBlock Text="Capture source" Grid.Row="1" Grid.Column="0"
+                               Style="{StaticResource LabelText}" Margin="0,8"/>
+                    <Grid Grid.Row="1" Grid.Column="1" Margin="6,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CaptureCombo" Grid.Column="0"
+                                  Style="{StaticResource ModernCombo}"
+                                  ToolTip="'All system audio (no echo)' uses the Win10 20348+ Process Loopback API to exclude this app from capture — recommended; lets you use the same physical device for capture and playback. The other 'Loopback: …' entries use legacy device loopback (will echo if same device as playback)."/>
+                        <Button x:Name="RefreshCaptureBtn" Grid.Column="1"
+                                Style="{StaticResource IconButton}"
+                                Content="↻" Margin="6,0,0,0"
+                                ToolTip="Refresh — re-detect running processes and audio devices."
+                                Click="RefreshCaptureBtn_Click"/>
+                    </Grid>
+
+                    <TextBlock Text="Playback device" Grid.Row="2" Grid.Column="0"
+                               Style="{StaticResource LabelText}" Margin="0,8"/>
+                    <Grid Grid.Row="2" Grid.Column="1" Margin="6,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="PlayCombo" Grid.Column="0"
+                                  Style="{StaticResource ModernCombo}"/>
+                        <Button x:Name="RefreshPlaybackBtn" Grid.Column="1"
+                                Style="{StaticResource IconButton}"
+                                Content="↻" Margin="6,0,0,0"
+                                ToolTip="Refresh — re-enumerate render devices (e.g. after Bluetooth reconnects or you plug in headphones)."
+                                Click="RefreshPlaybackBtn_Click"/>
+                    </Grid>
+
+                    <WrapPanel Grid.Row="3" Grid.Column="1" Margin="6,10,6,4">
+                        <CheckBox x:Name="MuteCheck" Style="{StaticResource ModernCheck}"
+                                  Content="Transcript only" Margin="0,4,20,4"/>
+                        <CheckBox x:Name="AltUrlCheck" Style="{StaticResource ModernCheck}"
+                                  Content="Alt endpoint" Margin="0,4,20,4"/>
+                        <CheckBox x:Name="EchoSuppressCheck" Style="{StaticResource ModernCheck}"
+                                  Content="Echo suppress" Margin="0,4,20,4"
+                                  ToolTip="Silences input to API while translation is playing. Prevents echo loops but the model may stall after a few seconds of silence."/>
+                        <CheckBox x:Name="MuteOtherDevicesCheck" Style="{StaticResource ModernCheck}"
+                                  IsChecked="True"
+                                  Content="Mute other speakers" Margin="0,4,20,4"
+                                  ToolTip="Translation-only listening, with no manual audio config:&#x0A;&#x0A; (1) If the Windows default render device is your Playback device, switch the default to a non-Playback device (prefer Onboard Speaker) so source apps don't auto-route to your headphones. Uses IPolicyConfigVista.&#x0A; (2) Set the master Mute on every other render endpoint. Endpoint mute is applied at the driver stage, AFTER WASAPI loopback taps the audio engine, so the API still gets full source audio while physical speakers stay silent.&#x0A;&#x0A;Both reverted on Stop."/>
+                        <CheckBox x:Name="DuckCheck" Style="{StaticResource ModernCheck}"
+                                  IsChecked="True"
+                                  Content="Duck source to" Margin="0,4,8,4"
+                                  Checked="DuckCheck_Toggled" Unchecked="DuckCheck_Toggled"
+                                  ToolTip="Lower other apps' session volumes while translation plays. Slider is clamped to ≥5% — at 0% the API would lose source signal and translation would stop."/>
+                        <TextBlock VerticalAlignment="Center" MinWidth="40" Margin="0,4,8,4"
+                                   Foreground="{StaticResource Accent}"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding ElementName=DuckSlider, Path=Value, StringFormat={}{0:F0}%}"/>
+                        <Slider x:Name="DuckSlider" Style="{StaticResource ModernSlider}"
+                                Minimum="5" Maximum="80" Value="5"
+                                Width="130" SmallChange="5"
+                                TickFrequency="5" IsSnapToTickEnabled="True"
+                                Margin="0,4,0,4"
+                                ValueChanged="DuckSlider_ValueChanged"
+                                ToolTip="Volume kept for source apps while translation plays. Min is 5% — 0% would mute API input and stop translation."/>
+                    </WrapPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="4"
+                                Orientation="Vertical" Margin="20,4,0,4"
+                                VerticalAlignment="Center">
+                        <Button x:Name="StartBtn" Style="{StaticResource PrimaryButton}"
+                                Content="Start" Width="130" Height="44"
+                                Margin="0,0,0,8" Click="StartBtn_Click"/>
+                        <Button x:Name="ClearBtn" Style="{StaticResource FlatButton}"
+                                Content="Clear text" Width="130" Height="34"
+                                Click="ClearBtn_Click"/>
+                        <Button x:Name="ApiBtn" Style="{StaticResource FlatButton}"
+                                Content="API…" Width="130" Height="32"
+                                Margin="0,8,0,0"
+                                Click="ApiBtn_Click"
+                                ToolTip="Configure the API endpoint and key (supports reverse-proxy hosts)"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ===== Status row ===== -->
+                <DockPanel Grid.Row="1" Margin="2,16,2,10">
+                    <TextBlock Text="Status" Style="{StaticResource LabelText}"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="StatusText" Text="idle"
+                               Foreground="{StaticResource Accent}"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="11" FontWeight="SemiBold"/>
+                </DockPanel>
+
+                <!-- ===== Transcripts ===== -->
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="2*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Source (heard) -->
+                    <Grid Grid.Row="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="SOURCE (HEARD)" Style="{StaticResource SectionHeader}"/>
+                        <Border Grid.Row="1"
+                                Background="{StaticResource ContentBg}"
+                                BorderBrush="{StaticResource ControlBorder}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <TextBox x:Name="SourceText"
+                                     Style="{StaticResource TranscriptBox}"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     FontSize="12"
+                                     Foreground="{StaticResource TextSecondary}"/>
+                        </Border>
+                    </Grid>
+
+                    <GridSplitter Grid.Row="1" ResizeBehavior="PreviousAndNext"/>
+
+                    <!-- Translation -->
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="TRANSLATION" Style="{StaticResource SectionHeader}"/>
+                        <Border Grid.Row="1"
+                                Background="{StaticResource ContentBg}"
+                                BorderBrush="{StaticResource ControlBorder}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <TextBox x:Name="TargetText"
+                                     Style="{StaticResource TranscriptBox}"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     FontSize="14"/>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
