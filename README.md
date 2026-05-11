@@ -2,6 +2,9 @@
 
 WPF desktop app that captures Windows audio output (any app's playback), streams it to OpenAI's realtime translation model (`gpt-realtime-translate`), and renders the translated audio + dual-language transcript live.
 
+<img width="2065" height="314" alt="image" src="https://github.com/user-attachments/assets/0045411d-72c0-4323-81f9-a6d2906527c6" />
+
+
 ## Stack
 
 - **.NET 8** + **WPF** (Windows Desktop)
