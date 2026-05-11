@@ -1,5 +1,10 @@
 ﻿# Babelive (.NET)
 
+[![CI](https://github.com/babelive/windows/actions/workflows/ci.yml/badge.svg)](https://github.com/babelive/windows/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/babelive/windows?include_prereleases&sort=semver)](https://github.com/babelive/windows/releases/latest)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)](#requirements)
+
 WPF desktop app that captures Windows audio output (any app's playback), streams it to OpenAI's realtime translation model (`gpt-realtime-translate`), and renders the translated audio + dual-language transcript live.
 
 <img width="2065" height="314" alt="image" src="https://github.com/user-attachments/assets/0045411d-72c0-4323-81f9-a6d2906527c6" />
