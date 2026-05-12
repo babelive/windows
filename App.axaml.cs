@@ -1,11 +1,10 @@
-using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using MsBox.Avalonia;
-using MsbIcon = MsBox.Avalonia.Enums.Icon;
 using MsBox.Avalonia.Enums;
+using MsbIcon = MsBox.Avalonia.Enums.Icon;
 
 namespace Babelive;
 

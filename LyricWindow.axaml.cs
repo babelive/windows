@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
@@ -88,12 +87,13 @@ public partial class LyricWindow : Window
     }
 
     // ---- drag to move + double-click-snap --------------------------------
+    // Double-click detection uses Avalonia's PointerPressedEventArgs.ClickCount
+    // (it's already debounced by the OS click-time), so we don't need a manual
+    // "_lastClickAt + 350 ms window" check like the WPF version had.
     private bool _maybeStartDrag;
     private Point _maybeDragStartPos;
     private const double DragHysteresisPx = 3;
     private const double TopStripPx = 50;
-    private DateTime _lastClickAt = DateTime.MinValue;
-    private const int DoubleClickWindowMs = 350;
 
     private void Window_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -273,14 +273,6 @@ public partial class LyricWindow : Window
         {
             ToggleBtn.Content = _settings.IsRunning ? "■ Stop" : "▶ Start";
         });
-    }
-
-    public void ClearLyrics()
-    {
-        _sourceBuf = string.Empty;
-        _targetBuf = string.Empty;
-        SourceText.Text = string.Empty;
-        TranslationText.Text = string.Empty;
     }
 
     protected override void OnClosed(EventArgs e)

@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
 using Babelive.Translation;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
