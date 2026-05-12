@@ -131,7 +131,6 @@
                                   Content="Echo suppress" Margin="0,4,20,4"
                                   ToolTip="Silences input to API while translation is playing. Prevents echo loops but the model may stall after a few seconds of silence."/>
                         <CheckBox x:Name="MuteOtherDevicesCheck" Style="{StaticResource ModernCheck}"
-                                  IsChecked="True"
                                   Content="Mute other speakers" Margin="0,4,20,4"
                                   ToolTip="Translation-only listening, with no manual audio config:&#x0A;&#x0A; (1) If the Windows default render device is your Playback device, switch the default to a non-Playback device (prefer Onboard Speaker) so source apps don't auto-route to your headphones. Uses IPolicyConfigVista.&#x0A; (2) Set the master Mute on every other render endpoint. Endpoint mute is applied at the driver stage, AFTER WASAPI loopback taps the audio engine, so the API still gets full source audio while physical speakers stay silent.&#x0A;&#x0A;Both reverted on Stop."/>
                         <CheckBox x:Name="DuckCheck" Style="{StaticResource ModernCheck}"

@@ -159,10 +159,29 @@ public sealed class DuckController : IDisposable
     private readonly System.Threading.Timer _timer;
     private readonly TimeSpan _silenceTimeout;
     private long _playbackEndTicks; // 0 = idle
+    private int _translationActive; // 0 = idle, 1 = ducked. Use Interlocked.
     private bool _disposed;
 
     private const int OutputSampleRate = 24000;
     private static readonly long PlayerLatencyTicks = TimeSpan.FromMilliseconds(100).Ticks;
+
+    /// <summary>
+    /// True iff translation audio is currently playing (i.e. we're inside a
+    /// duck window). Atomic — readable from any thread.
+    /// </summary>
+    public bool IsTranslationActive => Volatile.Read(ref _translationActive) != 0;
+
+    /// <summary>
+    /// Fires only on duck-state transitions: <c>true</c> = translation just
+    /// started playing (callers should turn their own volumes down), <c>false</c>
+    /// = translation finished and the silence window elapsed (restore).
+    ///
+    /// Used by self-ducking consumers (e.g. the CABLE-mode source-monitor
+    /// player) which live in our own process and therefore can't go through
+    /// <see cref="AudioDucker"/> — that one deliberately skips our own PID so
+    /// the translation itself isn't ducked.
+    /// </summary>
+    public event Action<bool>? DuckedChanged;
 
     public DuckController(AudioDucker ducker, TimeSpan? silenceTimeout = null)
     {
@@ -189,6 +208,7 @@ public sealed class DuckController : IDisposable
         if (_disposed) return;
         if (audioByteCount > 0) ExtendPlaybackEnd(audioByteCount);
         try { _ducker.Duck(); } catch { /* never let this kill the WS loop */ }
+        SetTranslationActive(true);
     }
 
     private void ExtendPlaybackEnd(int byteCount)
@@ -215,7 +235,20 @@ public sealed class DuckController : IDisposable
         {
             try { _ducker.Restore(); } catch { /* ignore */ }
             Interlocked.Exchange(ref _playbackEndTicks, 0);
+            SetTranslationActive(false);
         }
+    }
+
+    /// <summary>
+    /// Update <see cref="_translationActive"/> and fire <see cref="DuckedChanged"/>
+    /// only on actual transitions, so subscribers don't see one event per
+    /// audio chunk.
+    /// </summary>
+    private void SetTranslationActive(bool active)
+    {
+        int desired = active ? 1 : 0;
+        if (Interlocked.Exchange(ref _translationActive, desired) == desired) return;
+        try { DuckedChanged?.Invoke(active); } catch { /* never break the timer */ }
     }
 
     public void Dispose()
@@ -224,5 +257,9 @@ public sealed class DuckController : IDisposable
         _disposed = true;
         try { _timer.Dispose(); } catch { /* ignore */ }
         try { _ducker.Dispose(); } catch { /* ignore */ }
+        // Fire one last "restored" so any self-ducking consumers reset their
+        // own volumes (the monitor player about to be Disposed too, but a
+        // clean exit state is still nicer for any other future subscribers).
+        SetTranslationActive(false);
     }
 }

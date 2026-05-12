@@ -16,6 +16,13 @@ public partial class MainWindow : Window
 
     private LoopbackCapture? _capture;
     private AudioPlayer? _player;
+    // Source-monitor player: only created in CABLE/virtual-cable capture mode
+    // (when the user routed source audio into a virtual cable so we could
+    // bypass Teams/DRM loopback protection — see PREVENT_LOOPBACK_CAPTURE).
+    // The virtual cable has no physical speaker, so without this the user
+    // would hear ONLY the translation, never the original. Plays the same
+    // PCM stream the translator sees, on the Playback device.
+    private AudioPlayer? _monitorPlayer;
     private RealtimeTranslatorClient? _client;
     private DuckController? _ducker;
     private EndpointMuter? _endpointMuter;
@@ -220,7 +227,9 @@ public partial class MainWindow : Window
     private void DuckSlider_ValueChanged(object sender,
         System.Windows.RoutedPropertyChangedEventArgs<double> e)
     {
-        // Live-update if a session is currently active
+        // Live-update if a session is currently active. The monitor reads
+        // _ducker.DuckRatio per PCM chunk, so its gain updates on the next
+        // ~10 ms tick — no extra call needed.
         if (_ducker != null) _ducker.DuckRatio = (float)(e.NewValue / 100.0);
     }
 
@@ -341,6 +350,52 @@ public partial class MainWindow : Window
             return;
         }
         var captureSource = _captureSources[CaptureCombo.SelectedIndex];
+
+        // Teams hard-blocks process loopback via AUDCLNT_STREAMFLAGS_PREVENT_
+        // LOOPBACK_CAPTURE — picking "Only: Microsoft Teams" gives silence.
+        // If the user has a virtual cable installed (the standard workaround),
+        // silently redirect to that device's loopback instead. We assume Teams
+        // has been pointed at the cable in its audio settings; if not the
+        // loopback will be quiet, but the status hint below explains why.
+        string? captureRedirectNote = null;
+        // PIDs we want to push to CABLE Input via per-app routing once
+        // _appRouter is constructed (done a bit lower in this method).
+        // Populated only in the loopback-protected-app → CABLE redirect path.
+        List<uint>? protectedPidsToRoute = null;
+        MMDevice? protectedRoutingCable = null;
+        if (captureSource is IncludeProcessSource protectedCheck
+            && IsLoopbackProtectedProcess(protectedCheck.Pid))
+        {
+            var cable = FindVirtualCableRender(_captureDevices);
+            if (cable != null)
+            {
+                captureSource = new DeviceCaptureSource(cable);
+                protectedRoutingCable = cable;
+                // For new Teams: audio comes from msedgewebview2 children of
+                // ms-teams.exe. For classic Teams / consumer Skype: audio
+                // comes from renderer subprocesses sharing the same exe name.
+                // Per-app routing is keyed on PID and doesn't inherit, so we
+                // collect the whole tree from every well-known root name.
+                // EnumerateTree's BFS keeps msedgewebview2 belonging to
+                // Outlook / Edge OUT of this set (they're not Teams children).
+                if (AppAudioRouter.IsSupported)
+                {
+                    try
+                    {
+                        var tree = ProcessTree.EnumerateTree("ms-teams", "Teams", "Skype");
+                        if (tree.Count > 0) protectedPidsToRoute = tree;
+                    }
+                    catch { /* P/Invoke fail — fall through; user can route manually */ }
+                }
+                var appLabel = LoopbackProtectedAppLabel(protectedCheck.Pid);
+                int n = protectedPidsToRoute?.Count ?? 0;
+                captureRedirectNote = n > 0
+                    ? $"{appLabel} blocks loopback — routed {n} process(es) to {cable.FriendlyName}"
+                    : $"{appLabel} blocks loopback — using {cable.FriendlyName} " +
+                      $"(set {appLabel}'s output device to it manually)";
+            }
+        }
+
         MMDevice? playDevice = PlayCombo.SelectedIndex > 0
             ? _playDevices[PlayCombo.SelectedIndex - 1]
             : null;
@@ -351,6 +406,23 @@ public partial class MainWindow : Window
         try
         {
             _capture = new LoopbackCapture(captureSource);
+
+            // Per-app route the loopback-protected app's PID tree to CABLE
+            // Input BEFORE starting capture, so Win11 22H2+'s live session
+            // migration completes (typically <100 ms) before our loopback
+            // sees a single silent tick. On older Windows the routing is
+            // persistent but only affects sessions opened AFTER it's set —
+            // user may need to rejoin the call once.
+            if (protectedPidsToRoute != null && protectedRoutingCable != null)
+            {
+                _appRouter ??= new AppAudioRouter();
+                foreach (var pid in protectedPidsToRoute)
+                {
+                    try { _appRouter.Route(pid, protectedRoutingCable.ID); }
+                    catch { /* per-PID failure; logged in LastError if any */ }
+                }
+            }
+
             _capture.Start();
 
             if (MuteCheck.IsChecked != true)
@@ -366,6 +438,43 @@ public partial class MainWindow : Window
                 _translationVolume = _player.Volume;
                 try { OnVolumeChanged?.Invoke(_translationVolume); } catch { /* ignore */ }
                 _player.Start();
+            }
+
+            // CABLE-mode source monitor: when capture is a virtual cable
+            // (VB-CABLE / VoiceMeeter / generic "virtual" device), the source
+            // audio was routed INTO the cable to bypass Teams/DRM
+            // PREVENT_LOOPBACK_CAPTURE protection — but that means the cable
+            // is the only "speaker" the source app sees, and the user's real
+            // speakers never get the original. Tee the captured PCM through
+            // the Playback device so they hear the source alongside the
+            // translation. Skipped when:
+            //   - "Transcript only" → user wants no audio playback at all
+            //   - "Mute other speakers" → user wants translation-only
+            //   - capture is not a virtual cable → original audio already
+            //     reaches physical speakers through normal Windows routing
+            if (MuteCheck.IsChecked != true
+                && MuteOtherDevicesCheck.IsChecked != true
+                && captureSource is DeviceCaptureSource cableSrc
+                && IsVirtualCableDevice(cableSrc.Device))
+            {
+                _monitorPlayer = new AudioPlayer(playDevice);
+                _monitorPlayer.Start();
+                // CRITICAL: don't ever set _monitorPlayer.Volume directly.
+                // NAudio's WasapiOut.Volume writes the session-level
+                // SimpleAudioVolume, and _monitorPlayer shares a Windows
+                // audio session with _player (same PID + same device), so
+                // touching it would also duck the translation. Instead, we
+                // scale PCM samples in-flight using the current duck state;
+                // _monitorPlayer.Volume stays at its session default.
+                _capture.Pcm24KHzAvailable += pcm =>
+                {
+                    var mp = _monitorPlayer;
+                    if (mp == null) return;
+                    var dc = _ducker;
+                    float gain = (dc != null && dc.IsTranslationActive)
+                        ? dc.DuckRatio : 1f;
+                    mp.Push(gain >= 0.999f ? pcm : ScalePcm16(pcm, gain));
+                };
             }
 
             // Optional ducking: lower other apps' session volumes on the
@@ -385,6 +494,10 @@ public partial class MainWindow : Window
                 };
                 var ratio = (float)(DuckSlider.Value / 100.0);
                 _ducker = new DuckController(new AudioDucker(deviceToDuck, ratio));
+                // The CABLE-mode source monitor reads _ducker.IsTranslationActive
+                // and _ducker.DuckRatio on every PCM chunk and scales samples
+                // accordingly — no event subscription needed, slider changes
+                // pick up automatically on the next ~10 ms chunk.
             }
 
             // Optional "Mute other speakers": for translation-only listening.
@@ -449,7 +562,9 @@ public partial class MainWindow : Window
                 // Step (2): per-app routing for sessions already on listenId
                 if (fallback != null && AppAudioRouter.IsSupported)
                 {
-                    _appRouter = new AppAudioRouter();
+                    // May already exist if Teams→CABLE routing was set up
+                    // above; reuse so we don't clobber its tracked PIDs.
+                    _appRouter ??= new AppAudioRouter();
                     try
                     {
                         if (captureSource is IncludeProcessSource ips)
@@ -521,7 +636,9 @@ public partial class MainWindow : Window
             MuteCheck.IsEnabled = AltUrlCheck.IsEnabled = DuckCheck.IsEnabled =
                 EchoSuppressCheck.IsEnabled = MuteOtherDevicesCheck.IsEnabled = false;
             var statusSuffix = _client.LogPath != null ? $"   log: {_client.LogPath}" : "";
-            StatusText.Text = $"running → {targetLang}{statusSuffix}";
+            StatusText.Text = captureRedirectNote != null
+                ? $"running → {targetLang}   ⚠ {captureRedirectNote}"
+                : $"running → {targetLang}{statusSuffix}";
             try { OnRunningChanged?.Invoke(); } catch { /* ignore */ }
         }
         catch (Exception ex)
@@ -564,6 +681,13 @@ public partial class MainWindow : Window
         {
             try { _player.Dispose(); } catch { /* ignore */ }
             _player = null;
+        }
+        if (_monitorPlayer != null)
+        {
+            // _capture is already disposed above, so no further events fire;
+            // safe to drop the subscriber reference along with the player.
+            try { _monitorPlayer.Dispose(); } catch { /* ignore */ }
+            _monitorPlayer = null;
         }
         if (_ducker != null)
         {
@@ -622,6 +746,125 @@ public partial class MainWindow : Window
         new(new Guid("1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E"), 0);
 
     /// <summary>
+    /// Apply a linear gain to a PCM16 little-endian mono buffer, returning a
+    /// new buffer with the scaled samples (clamped to short range). Used for
+    /// the CABLE-mode source monitor's ducking: scaling at the sample level
+    /// keeps the operation OUT of <see cref="AudioPlayer.Volume"/> (which is
+    /// session-shared with the translation player and would duck it too).
+    /// </summary>
+    private static byte[] ScalePcm16(byte[] input, float gain)
+    {
+        var output = new byte[input.Length];
+        for (int i = 0; i + 1 < input.Length; i += 2)
+        {
+            short sample = (short)(input[i] | (input[i + 1] << 8));
+            int scaled = (int)(sample * gain);
+            if (scaled > 32767) scaled = 32767;
+            else if (scaled < -32768) scaled = -32768;
+            output[i]     = (byte)(scaled & 0xFF);
+            output[i + 1] = (byte)((scaled >> 8) & 0xFF);
+        }
+        return output;
+    }
+
+    /// <summary>
+    /// Heuristic: does this device look like a virtual audio cable
+    /// (VB-CABLE, VoiceMeeter, generic "virtual …")?  Used both to skip them
+    /// when auto-picking a Playback device and to detect CABLE-mode capture
+    /// (so we can tee the source through the real Playback device).
+    /// </summary>
+    private static bool IsVirtualCableDevice(MMDevice d)
+    {
+        var name = (d.FriendlyName ?? string.Empty).ToLowerInvariant();
+        return name.Contains("cable") || name.Contains("vb-audio")
+            || name.Contains("voicemeeter") || name.Contains("virtual");
+    }
+
+    /// <summary>
+    /// Returns true if the given PID belongs to a Microsoft calling app that
+    /// sets <c>AUDCLNT_STREAMFLAGS_PREVENT_LOOPBACK_CAPTURE</c> on its render
+    /// stream — Windows' Process Loopback API returns silence for these for
+    /// privacy reasons, so we redirect to a virtual-cable loopback instead.
+    /// Currently matches:
+    /// <list type="bullet">
+    ///   <item>new Teams (<c>ms-teams.exe</c>)</item>
+    ///   <item>classic Teams (<c>Teams.exe</c>)</item>
+    ///   <item>Skype consumer (<c>Skype.exe</c>) — same call stack lineage</item>
+    /// </list>
+    /// Zoom / Discord / Meet / Webex / Slack do NOT need this — their WebRTC
+    /// stacks don't set the flag and Process Loopback works directly.
+    /// </summary>
+    private static bool IsLoopbackProtectedProcess(uint pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById((int)pid);
+            var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+            return name == "ms-teams" || name == "teams" || name == "skype";
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Human-readable label for the app behind <paramref name="pid"/>, used
+    /// only in the status-bar redirect note so the user knows which app
+    /// triggered the auto-route.
+    /// </summary>
+    private static string LoopbackProtectedAppLabel(uint pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById((int)pid);
+            var name = (p.ProcessName ?? string.Empty).ToLowerInvariant();
+            return name switch
+            {
+                "ms-teams" or "teams" => "Teams",
+                "skype" => "Skype",
+                _ => "This app",
+            };
+        }
+        catch { return "This app"; }
+    }
+
+    /// <summary>
+    /// Find a virtual-cable RENDER endpoint to use as a loopback source.
+    /// Priority:
+    ///   1. Standard 2-channel <c>CABLE Input (VB-Audio Virtual Cable)</c>
+    ///      — what Teams / Chrome / most stereo apps default to. Perfect
+    ///      format match, no resampling surprises.
+    ///   2. Any other VB-Audio cable variant (Hi-Fi Cable, CABLE-A/B/C/D
+    ///      from the donationware pack).
+    ///   3. VoiceMeeter / generic "virtual" devices.
+    /// Multi-channel ASIO-bridge variants (<c>… 16ch</c>, <c>… 32ch</c>,
+    /// <c>… 64ch</c>) are SKIPPED — they cause format-mismatch / silent-
+    /// channel issues when a 2-channel app (Teams) is routed through them.
+    /// </summary>
+    private static MMDevice? FindVirtualCableRender(IEnumerable<MMDevice> renderDevices)
+    {
+        MMDevice? altCable = null;
+        MMDevice? genericVirtual = null;
+        foreach (var d in renderDevices)
+        {
+            var name = (d.FriendlyName ?? string.Empty).ToLowerInvariant();
+
+            // Skip pro-audio multi-channel variants — wrong format for
+            // stereo apps and they'll silently degrade.
+            if (name.Contains("16ch") || name.Contains("32ch") || name.Contains("64ch"))
+                continue;
+
+            // Tier 1: short-circuit on the canonical 2-ch CABLE Input.
+            if (name.StartsWith("cable input"))
+                return d;
+
+            if (altCable == null && (name.Contains("cable") || name.Contains("vb-audio")))
+                altCable = d;
+            if (genericVirtual == null && (name.Contains("voicemeeter") || name.Contains("virtual")))
+                genericVirtual = d;
+        }
+        return altCable ?? genericVirtual;
+    }
+
+    /// <summary>
     /// Score a playback candidate. Higher = better. Returns 0 (skip) for
     /// devices we never want to auto-pick (virtual cables, the capture
     /// device itself).
@@ -632,8 +875,7 @@ public partial class MainWindow : Window
 
         // Never auto-pick virtual cables for playback (they have no physical
         // output) and never pick the same device we're capturing from.
-        if (name.Contains("cable") || name.Contains("vb-audio")
-            || name.Contains("voicemeeter") || name.Contains("virtual"))
+        if (IsVirtualCableDevice(d))
             return 0;
         if (captureId != null && d.ID == captureId)
             return 0;

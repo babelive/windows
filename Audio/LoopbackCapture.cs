@@ -51,6 +51,19 @@ public sealed class LoopbackCapture : IDisposable
     public WaveFormat SourceFormat => _capture.WaveFormat;
     public CaptureSource Source { get; }
 
+    /// <summary>
+    /// Fires after each captured chunk has been enqueued for the translator.
+    /// Emits the same 24 kHz / mono / PCM16 buffer. Used by the CABLE-mode
+    /// source-monitor feature: when the user's capture source is a virtual
+    /// cable, the original audio was diverted into the cable and would
+    /// otherwise never reach physical speakers — this lets MainWindow tee the
+    /// same stream into a second AudioPlayer on the Playback device.
+    ///
+    /// PCM format matches <see cref="AudioPlayer"/>'s input (24 kHz mono
+    /// PCM16) so no extra conversion is needed downstream.
+    /// </summary>
+    public event Action<byte[]>? Pcm24KHzAvailable;
+
     public LoopbackCapture(CaptureSource source)
     {
         Source = source;
@@ -120,6 +133,10 @@ public sealed class LoopbackCapture : IDisposable
             outBuf[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
         }
         _channel.Writer.TryWrite(outBuf);
+
+        // Tee the same PCM16/24 kHz buffer to the monitor subscriber (if any).
+        // Wrapped in try/catch so a buggy handler never tears down capture.
+        try { Pcm24KHzAvailable?.Invoke(outBuf); } catch { /* ignore */ }
     }
 
     public void Dispose()
