@@ -78,34 +78,80 @@
                     Click="RefreshPlaybackBtn_Click"/>
           </Grid>
 
-          <WrapPanel Grid.Row="3" Grid.Column="1" Margin="6,10,6,4">
-            <CheckBox x:Name="MuteCheck"
-                      Content="Transcript only" Margin="0,4,20,4"/>
-            <CheckBox x:Name="AltUrlCheck"
-                      Content="Alt endpoint" Margin="0,4,20,4"/>
-            <CheckBox x:Name="EchoSuppressCheck"
-                      Content="Echo suppress" Margin="0,4,20,4"
-                      ToolTip.Tip="Silences input to API while translation is playing. Prevents echo loops but the model may stall after a few seconds of silence."/>
-            <CheckBox x:Name="MuteOtherDevicesCheck"
-                      Content="Mute other speakers" Margin="0,4,20,4"
-                      ToolTip.Tip="Translation-only listening, with no manual audio config: (1) switches the Windows default render device if needed, (2) mutes every other render endpoint. Both reverted on Stop."/>
-            <CheckBox x:Name="DuckCheck"
-                      IsChecked="True"
-                      Content="Duck source to" Margin="0,4,8,4"
-                      Click="DuckCheck_Toggled"
-                      ToolTip.Tip="Lower other apps' session volumes while translation plays. Slider is clamped to ≥5% — at 0% the API would lose source signal and translation would stop."/>
-            <TextBlock VerticalAlignment="Center" MinWidth="40" Margin="0,4,8,4"
-                       Foreground="{StaticResource Accent}"
-                       FontWeight="SemiBold"
-                       Text="{Binding #DuckSlider.Value, StringFormat={}{0:F0}%}"/>
-            <Slider x:Name="DuckSlider"
-                    Minimum="5" Maximum="80" Value="5"
-                    Width="130" SmallChange="5"
-                    TickFrequency="5" IsSnapToTickEnabled="True"
-                    Margin="0,4,0,4"
-                    ValueChanged="DuckSlider_ValueChanged"
-                    ToolTip.Tip="Volume kept for source apps while translation plays. Min is 5% — 0% would mute API input and stop translation."/>
-          </WrapPanel>
+          <StackPanel Grid.Row="3" Grid.Column="1" Margin="6,10,6,4">
+            <!-- Top row: option toggles -->
+            <WrapPanel>
+              <CheckBox x:Name="MuteCheck"
+                        Content="Transcript only" Margin="0,4,20,4"/>
+              <CheckBox x:Name="AltUrlCheck"
+                        Content="Alt endpoint" Margin="0,4,20,4"/>
+              <CheckBox x:Name="EchoSuppressCheck"
+                        Content="Echo suppress" Margin="0,4,20,4"
+                        ToolTip.Tip="Silences input to API while translation is playing. Prevents echo loops but the model may stall after a few seconds of silence."/>
+              <CheckBox x:Name="MuteOtherDevicesCheck"
+                        Content="Mute other speakers" Margin="0,4,20,4"
+                        ToolTip.Tip="Translation-only listening, with no manual audio config: (1) switches the Windows default render device if needed, (2) mutes every other render endpoint. Both reverted on Stop."/>
+            </WrapPanel>
+
+            <!-- Volume sliders. Grid for column alignment between rows.
+                 Source row gates ducking via DuckCheck; Translation row is
+                 always live (mirrors TranslationVolume property which is
+                 also poked by the lyric overlay's 🔉/🔊 buttons). -->
+            <Grid Margin="0,6,0,0"
+                  ColumnDefinitions="170,50,*"
+                  RowDefinitions="Auto,Auto">
+
+              <!-- Source volume — the level source apps drop to during
+                   translation playback. 100% means "don't duck at all"
+                   (skip the AudioDucker entirely). Minimum 5% because 0%
+                   would mute the input the API hears and translation stalls. -->
+              <TextBlock Grid.Row="0" Grid.Column="0"
+                         Text="Source volume"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextPrimary}"
+                         Margin="0,0,0,0"/>
+              <TextBlock Grid.Row="0" Grid.Column="1"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource Accent}"
+                         FontWeight="SemiBold"
+                         Text="{Binding #DuckSlider.Value, StringFormat={}{0:F0}%}"/>
+              <Slider Grid.Row="0" Grid.Column="2"
+                      x:Name="DuckSlider"
+                      Minimum="5" Maximum="100" Value="10"
+                      SmallChange="5"
+                      TickFrequency="5" IsSnapToTickEnabled="True"
+                      HorizontalAlignment="Stretch" MaxWidth="260"
+                      VerticalAlignment="Center"
+                      ValueChanged="DuckSlider_ValueChanged"
+                      PointerWheelChanged="Slider_PointerWheelChanged"
+                      ToolTip.Tip="Volume source apps drop to while translation plays. 100% = no ducking. Minimum 5% — at 0% the API would lose source signal and translation would stall."/>
+
+              <!-- Translation volume — always active. Two-way synced with the
+                   TranslationVolume property (lyric overlay 🔉/🔊 also drives it). -->
+              <TextBlock Grid.Row="1" Grid.Column="0"
+                         Text="Translation volume"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource TextPrimary}"
+                         Margin="0,8,0,0"/>
+              <TextBlock Grid.Row="1" Grid.Column="1"
+                         VerticalAlignment="Center"
+                         Foreground="{StaticResource Accent}"
+                         FontWeight="SemiBold"
+                         Margin="0,8,0,0"
+                         Text="{Binding #TranslationVolumeSlider.Value, StringFormat={}{0:F0}%}"/>
+              <Slider Grid.Row="1" Grid.Column="2"
+                      x:Name="TranslationVolumeSlider"
+                      Minimum="0" Maximum="100" Value="100"
+                      SmallChange="5"
+                      TickFrequency="10" IsSnapToTickEnabled="False"
+                      HorizontalAlignment="Stretch" MaxWidth="260"
+                      VerticalAlignment="Center"
+                      Margin="0,8,0,0"
+                      ValueChanged="TranslationVolumeSlider_ValueChanged"
+                      PointerWheelChanged="Slider_PointerWheelChanged"
+                      ToolTip.Tip="Playback volume of the translated audio. Also adjustable in the lyric overlay's 🔉/🔊 buttons."/>
+            </Grid>
+          </StackPanel>
 
           <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="4"
                       Orientation="Vertical" Margin="20,4,0,4"

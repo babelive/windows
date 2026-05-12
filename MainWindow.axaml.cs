@@ -83,6 +83,18 @@ public partial class MainWindow : Window
         ApplyAppSettings();
         PopulateLanguages();
         PopulateDevices();
+
+        // Initialize the translation-volume slider and keep it in sync when
+        // anything else (lyric overlay 🔉/🔊, Start-time read of session
+        // volume) writes to TranslationVolume. The tolerance check inside
+        // OnVolumeChanged breaks the slider ↔ property loop.
+        TranslationVolumeSlider.Value = _translationVolume * 100.0;
+        OnVolumeChanged += vol =>
+        {
+            var target = vol * 100.0;
+            if (Math.Abs(TranslationVolumeSlider.Value - target) > 0.5)
+                TranslationVolumeSlider.Value = target;
+        };
     }
 
     /// <summary>
@@ -229,11 +241,32 @@ public partial class MainWindow : Window
         if (_ducker != null) _ducker.DuckRatio = (float)(e.NewValue / 100.0);
     }
 
-    private void DuckCheck_Toggled(object? sender, RoutedEventArgs e)
+    private void TranslationVolumeSlider_ValueChanged(object? sender,
+        RangeBaseValueChangedEventArgs e)
     {
-        // The checkbox is consulted when starting; this just enables/disables
-        // the slider in the UI for clarity.
-        if (DuckSlider != null) DuckSlider.IsEnabled = DuckCheck.IsChecked == true;
+        // Writes to TranslationVolume, which forwards to _player.Volume and
+        // raises OnVolumeChanged. The constructor's OnVolumeChanged handler
+        // guards against the resulting feedback loop via a 0.5% tolerance.
+        TranslationVolume = (float)(e.NewValue / 100.0);
+    }
+
+    /// <summary>
+    /// Shared handler for both volume sliders: a mouse-wheel notch over a
+    /// hovered slider nudges Value by <see cref="RangeBase.SmallChange"/>
+    /// (5% for both). Avalonia's Slider has no built-in wheel support, but
+    /// the gesture is standard everywhere else (browser audio sliders,
+    /// system volume mixer, …) so users will expect it. Marks the event
+    /// handled so it doesn't bubble up and scroll a parent ScrollViewer.
+    /// </summary>
+    private void Slider_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (sender is not Slider s || !s.IsEnabled) return;
+        double step = s.SmallChange > 0 ? s.SmallChange : 1;
+        if (e.Delta.Y > 0)
+            s.Value = Math.Min(s.Maximum, s.Value + step);
+        else if (e.Delta.Y < 0)
+            s.Value = Math.Max(s.Minimum, s.Value - step);
+        e.Handled = true;
     }
 
     private void RefreshCaptureBtn_Click(object? sender, RoutedEventArgs e)
@@ -416,15 +449,19 @@ public partial class MainWindow : Window
                 };
             }
 
-            if (DuckCheck.IsChecked == true)
+            // Source-volume ducking is implicit: slider at 100% means
+            // "don't touch other apps" → skip _ducker entirely. The CABLE-
+            // mode source monitor's PCM-level scaler then sees _ducker==null
+            // and uses gain=1.0, matching the no-duck intent.
+            var duckRatio = (float)(DuckSlider.Value / 100.0);
+            if (duckRatio < 0.99f)
             {
                 MMDevice deviceToDuck = captureSource switch
                 {
                     DeviceCaptureSource dcs => dcs.Device,
                     _ => playDevice ?? LoopbackCapture.DefaultRenderDevice(),
                 };
-                var ratio = (float)(DuckSlider.Value / 100.0);
-                _ducker = new DuckController(new AudioDucker(deviceToDuck, ratio));
+                _ducker = new DuckController(new AudioDucker(deviceToDuck, duckRatio));
             }
 
             if (MuteOtherDevicesCheck.IsChecked == true)
@@ -522,7 +559,7 @@ public partial class MainWindow : Window
             _running = true;
             StartBtn.Content = "Stop";
             LangCombo.IsEnabled = CaptureCombo.IsEnabled = PlayCombo.IsEnabled = false;
-            MuteCheck.IsEnabled = AltUrlCheck.IsEnabled = DuckCheck.IsEnabled =
+            MuteCheck.IsEnabled = AltUrlCheck.IsEnabled =
                 EchoSuppressCheck.IsEnabled = MuteOtherDevicesCheck.IsEnabled = false;
             var statusSuffix = _client.LogPath != null ? $"   log: {_client.LogPath}" : "";
             StatusText.Text = captureRedirectNote != null
@@ -546,7 +583,7 @@ public partial class MainWindow : Window
         _running = false;
         StartBtn.Content = "Start";
         LangCombo.IsEnabled = CaptureCombo.IsEnabled = PlayCombo.IsEnabled = true;
-        MuteCheck.IsEnabled = AltUrlCheck.IsEnabled = DuckCheck.IsEnabled =
+        MuteCheck.IsEnabled = AltUrlCheck.IsEnabled =
             EchoSuppressCheck.IsEnabled = MuteOtherDevicesCheck.IsEnabled = true;
         StatusText.Text = "stopped";
         try { OnRunningChanged?.Invoke(); } catch { /* ignore */ }
