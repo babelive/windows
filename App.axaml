@@ -1,0 +1,11 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Babelive.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme />
+    <!-- All control styles + brushes live in this file (ported from
+         the WPF App.xaml Application.Resources block). -->
+    <StyleInclude Source="avares://Babelive/Styles/Controls.axaml"/>
+  </Application.Styles>
+</Application>

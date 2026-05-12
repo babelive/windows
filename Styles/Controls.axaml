@@ -1,0 +1,301 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ============================================================
+       Brushes — declared as Resources so {StaticResource X} works
+       the same as in WPF.
+       ============================================================ -->
+  <Styles.Resources>
+    <ResourceDictionary>
+      <SolidColorBrush x:Key="WindowBg"           Color="#FF1F2024"/>
+      <SolidColorBrush x:Key="WindowBorder"       Color="#33FFFFFF"/>
+      <SolidColorBrush x:Key="ContentBg"          Color="#22000000"/>
+      <SolidColorBrush x:Key="ControlBg"          Color="#22FFFFFF"/>
+      <SolidColorBrush x:Key="ControlBgHover"     Color="#33FFFFFF"/>
+      <SolidColorBrush x:Key="ControlBgPress"     Color="#44FFFFFF"/>
+      <SolidColorBrush x:Key="ControlBorder"      Color="#22FFFFFF"/>
+      <SolidColorBrush x:Key="ControlBorderHover" Color="#55FFFFFF"/>
+      <SolidColorBrush x:Key="TextPrimary"        Color="#FFEFEFF1"/>
+      <SolidColorBrush x:Key="TextSecondary"      Color="#FFCFD0D2"/>
+      <SolidColorBrush x:Key="TextMuted"          Color="#FF85878C"/>
+      <SolidColorBrush x:Key="Accent"             Color="#FFFFB938"/>
+      <SolidColorBrush x:Key="AccentHover"        Color="#FFFFCB66"/>
+      <SolidColorBrush x:Key="AccentPress"        Color="#FFE6A220"/>
+      <SolidColorBrush x:Key="AccentTinted"       Color="#33FFB938"/>
+      <SolidColorBrush x:Key="DangerHover"        Color="#FFE03E3E"/>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- ============================================================
+       TextBlock helpers — applied via Classes="..."
+       ============================================================ -->
+  <Style Selector="TextBlock.label">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="FontSize" Value="13"/>
+  </Style>
+
+  <Style Selector="TextBlock.section">
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Margin" Value="2,0,0,4"/>
+  </Style>
+
+  <Style Selector="TextBlock.helper">
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="Margin" Value="0,4,0,0"/>
+  </Style>
+
+  <!-- ============================================================
+       Caption (title-bar) buttons. Used by Classes="caption".
+       Avalonia's IsHitTestVisibleInChrome / WindowChrome equivalent is
+       handled by ExtendClientArea hints on the Window itself, plus
+       each control's `e.Handled = true` in PointerPressed.
+       ============================================================ -->
+  <Style Selector="Button.caption">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Width" Value="46"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="FontFamily" Value="Segoe UI, Segoe UI Symbol"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bd" Background="{TemplateBinding Background}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.caption:pointerover /template/ Border#Bd">
+    <Setter Property="Background" Value="#22FFFFFF"/>
+  </Style>
+  <Style Selector="Button.caption:pointerover">
+    <Setter Property="Foreground" Value="White"/>
+  </Style>
+
+  <!-- Close-flavor caption button: same as above but red on hover. -->
+  <Style Selector="Button.caption.close">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bd" Background="{TemplateBinding Background}"
+                CornerRadius="0,12,0,0">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.caption.close:pointerover /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource DangerHover}"/>
+  </Style>
+  <Style Selector="Button.caption.close:pointerover">
+    <Setter Property="Foreground" Value="White"/>
+  </Style>
+
+  <!-- ============================================================
+       Flat / primary / icon buttons. Class="flat" / "primary" / "icon".
+       ============================================================ -->
+  <Style Selector="Button.flat">
+    <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="14,8"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bd"
+                Background="{TemplateBinding Background}"
+                CornerRadius="6"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            Content="{TemplateBinding Content}"
+                            RecognizesAccessKey="True"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.flat:pointerover /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource ControlBgHover}"/>
+  </Style>
+  <Style Selector="Button.flat:pressed /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource ControlBgPress}"/>
+  </Style>
+  <Style Selector="Button.flat:disabled">
+    <Setter Property="Opacity" Value="0.45"/>
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{StaticResource Accent}"/>
+    <Setter Property="Foreground" Value="#FF1A1A1A"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="14,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bd"
+                Background="{TemplateBinding Background}"
+                CornerRadius="6"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource AccentPress}"/>
+  </Style>
+
+  <Style Selector="Button.icon">
+    <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Width" Value="32"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Bd"
+                Background="{TemplateBinding Background}"
+                CornerRadius="6">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.icon:pointerover /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource ControlBgHover}"/>
+  </Style>
+  <Style Selector="Button.icon:pressed /template/ Border#Bd">
+    <Setter Property="Background" Value="{StaticResource ControlBgPress}"/>
+  </Style>
+
+  <!-- ============================================================
+       ComboBox — Avalonia ships a Fluent ComboBox; we just override
+       a few brushes so it matches the dark amber theme. We don't
+       redo the entire template (which was needed in WPF to get a
+       dark popup) because Avalonia's defaults already do that.
+       ============================================================ -->
+  <Style Selector="ComboBox">
+    <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="Padding" Value="12,4"/>
+    <Setter Property="CornerRadius" Value="6"/>
+  </Style>
+  <Style Selector="ComboBox:pointerover">
+    <Setter Property="Background" Value="{StaticResource ControlBgHover}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource ControlBorderHover}"/>
+  </Style>
+  <Style Selector="ComboBox:focus">
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+  </Style>
+  <Style Selector="ComboBoxItem">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Padding" Value="10,7"/>
+  </Style>
+  <Style Selector="ComboBoxItem:pointerover">
+    <Setter Property="Background" Value="{StaticResource ControlBgHover}"/>
+  </Style>
+  <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource AccentTinted}"/>
+  </Style>
+
+  <!-- ============================================================
+       CheckBox — Avalonia Fluent already has a nice checkbox; we
+       just tint the check + box.
+       ============================================================ -->
+  <Style Selector="CheckBox">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+  <!-- ============================================================
+       Slider — minimal recolor; Avalonia Fluent slider matches our
+       thin track + thumb aesthetic out of the box.
+       ============================================================ -->
+  <Style Selector="Slider">
+    <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+    <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+  </Style>
+
+  <!-- ============================================================
+       Transcript TextBox (multi-line, read-only)
+       ============================================================ -->
+  <Style Selector="TextBox.transcript">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="CaretBrush" Value="White"/>
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
+    <Setter Property="Padding" Value="14,12"/>
+  </Style>
+
+  <!-- ============================================================
+       Form input TextBox (single-line dark rounded)
+       ============================================================ -->
+  <Style Selector="TextBox.input">
+    <Setter Property="Background" Value="{StaticResource ControlBg}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource ControlBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CaretBrush" Value="White"/>
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="CornerRadius" Value="6"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="TextBox.input:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource ControlBorderHover}"/>
+  </Style>
+  <Style Selector="TextBox.input:focus">
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+  </Style>
+
+  <!-- ============================================================
+       GridSplitter — minimal flat style
+       ============================================================ -->
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="Cursor" Value="SizeNorthSouth"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="Transparent">
+          <Border Height="2" Width="40"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                  Background="{StaticResource ControlBorder}"
+                  CornerRadius="1"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+</Styles>

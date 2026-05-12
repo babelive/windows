@@ -1,13 +1,15 @@
-﻿using System.Drawing;
-using System.Windows;
-using System.Windows.Forms;
-using Application = System.Windows.Application;
-using MessageBox = System.Windows.MessageBox;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
+using MsBox.Avalonia;
+using MsBox.Avalonia.Enums;
+using MsbIcon = MsBox.Avalonia.Enums.Icon;
 
 namespace Babelive;
 
 /// <summary>
-/// Owns the system-tray <see cref="NotifyIcon"/> and its context menu so
+/// Owns the system-tray <see cref="TrayIcon"/> and its context menu so
 /// the user can:
 /// <list type="bullet">
 ///   <item>Toggle translation on/off</item>
@@ -20,11 +22,11 @@ namespace Babelive;
 /// </summary>
 public sealed class TrayIconHost : IDisposable
 {
-    private readonly NotifyIcon _icon;
+    private readonly TrayIcon _icon;
     private readonly MainWindow _settings;
     private readonly LyricWindow _lyrics;
-    private readonly ToolStripMenuItem _toggleItem;
-    private readonly ToolStripMenuItem _showLyricsItem;
+    private readonly NativeMenuItem _toggleItem;
+    private readonly NativeMenuItem _showLyricsItem;
     private bool _disposed;
 
     public TrayIconHost(MainWindow settings, LyricWindow lyrics)
@@ -32,29 +34,39 @@ public sealed class TrayIconHost : IDisposable
         _settings = settings;
         _lyrics = lyrics;
 
-        _icon = new NotifyIcon
+        _icon = new TrayIcon
         {
-            Icon = LoadIcon(),
-            Visible = true,
-            Text = "Babelive",
+            Icon = AppIcon.Build(),
+            ToolTipText = "Babelive",
+            IsVisible = true,
         };
 
-        var menu = new ContextMenuStrip();
+        var menu = new NativeMenu();
 
-        _toggleItem = new ToolStripMenuItem("Start translation") { ShortcutKeyDisplayString = "" };
+        _toggleItem = new NativeMenuItem("Start translation");
         _toggleItem.Click += async (_, _) =>
         {
             try { await _settings.ToggleRunningAsync(); }
-            catch (Exception ex) { ShowError("Toggle failed", ex); }
+            catch (Exception ex) { await ShowError("Toggle failed", ex); }
         };
         menu.Items.Add(_toggleItem);
 
-        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new NativeMenuItemSeparator());
 
-        _showLyricsItem = new ToolStripMenuItem("Show lyric overlay") { CheckOnClick = true, Checked = true };
-        _showLyricsItem.CheckedChanged += (_, _) =>
+        _showLyricsItem = new NativeMenuItem("Show lyric overlay")
         {
-            if (_showLyricsItem.Checked)
+            // ToggleType enum location varies between Avalonia versions and
+            // native menus on Windows don't always render the checkmark
+            // reliably — we track state via IsChecked and update the menu
+            // text in the click handler so the user sees the toggle effect.
+            IsChecked = true,
+        };
+        _showLyricsItem.Click += (_, _) =>
+        {
+            // Avalonia's NativeMenuItem doesn't auto-flip IsChecked for
+            // CheckBox toggle type the way WinForms did — do it manually.
+            _showLyricsItem.IsChecked = !_showLyricsItem.IsChecked;
+            if (_showLyricsItem.IsChecked)
             {
                 if (!_lyrics.IsVisible) _lyrics.Show();
                 _lyrics.Activate();
@@ -63,20 +75,27 @@ public sealed class TrayIconHost : IDisposable
         };
         menu.Items.Add(_showLyricsItem);
 
-        var settingsItem = new ToolStripMenuItem("Settings…");
+        var settingsItem = new NativeMenuItem("Settings…");
         settingsItem.Click += (_, _) => OpenSettings();
         menu.Items.Add(settingsItem);
 
-        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new NativeMenuItemSeparator());
 
-        var exitItem = new ToolStripMenuItem("Exit");
-        exitItem.Click += (_, _) => Application.Current.Shutdown();
+        var exitItem = new NativeMenuItem("Exit");
+        exitItem.Click += (_, _) =>
+        {
+            if (Application.Current?.ApplicationLifetime
+                is IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
+        };
         menu.Items.Add(exitItem);
 
-        _icon.ContextMenuStrip = menu;
+        _icon.Menu = menu;
 
-        // Double-click → open settings (common pattern)
-        _icon.DoubleClick += (_, _) => OpenSettings();
+        // Left-click on the icon opens the settings window (Avalonia
+        // exposes a single Clicked event — there's no separate
+        // DoubleClick — so single-click-to-open is the only sensible UX).
+        _icon.Clicked += (_, _) => OpenSettings();
 
         // Keep the toggle item label in sync with running state
         _settings.OnRunningChanged += UpdateToggleLabel;
@@ -84,52 +103,39 @@ public sealed class TrayIconHost : IDisposable
 
         // Keep "Show lyric overlay" check in sync if the user closes the
         // overlay via its ✕ button (which Hides rather than Closes).
-        _lyrics.IsVisibleChanged += (_, _) =>
+        // Avalonia exposes IsVisible as an AvaloniaProperty; subscribe to
+        // changes via the property-changed observable.
+        _lyrics.PropertyChanged += (_, e) =>
         {
-            if (_showLyricsItem.Checked != _lyrics.IsVisible)
-                _showLyricsItem.Checked = _lyrics.IsVisible;
+            if (e.Property == Window.IsVisibleProperty
+                && _showLyricsItem.IsChecked != _lyrics.IsVisible)
+                _showLyricsItem.IsChecked = _lyrics.IsVisible;
         };
     }
 
     private void OpenSettings()
     {
-        if (!_settings.IsVisible) _settings.Show();
-        if (_settings.WindowState == WindowState.Minimized)
-            _settings.WindowState = WindowState.Normal;
-        _settings.Activate();
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_settings.IsVisible) _settings.Show();
+            if (_settings.WindowState == WindowState.Minimized)
+                _settings.WindowState = WindowState.Normal;
+            _settings.Activate();
+        });
     }
 
     private void UpdateToggleLabel()
     {
-        // NotifyIcon menu lives on UI thread; Dispatcher.Invoke for safety.
-        Application.Current.Dispatcher.BeginInvoke(() =>
+        Dispatcher.UIThread.Post(() =>
         {
-            _toggleItem.Text = _settings.IsRunning ? "Stop translation" : "Start translation";
+            _toggleItem.Header = _settings.IsRunning ? "Stop translation" : "Start translation";
         });
     }
 
-    private static void ShowError(string title, Exception ex) =>
-        MessageBox.Show(ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
-
-    /// <summary>Generate a tiny solid-color icon at runtime so we don't need a .ico asset.</summary>
-    private static Icon LoadIcon()
+    private static async Task ShowError(string title, Exception ex)
     {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using var brush = new SolidBrush(Color.FromArgb(255, 58, 115, 196));
-            g.FillEllipse(brush, 2, 2, 28, 28);
-            using var font = new Font("Segoe UI", 14, System.Drawing.FontStyle.Bold);
-            using var white = new SolidBrush(Color.White);
-            var sf = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center,
-            };
-            g.DrawString("译", font, white, new RectangleF(0, 0, 32, 32), sf);
-        }
-        return Icon.FromHandle(bmp.GetHicon());
+        await MessageBoxManager.GetMessageBoxStandard(
+            title, ex.Message, ButtonEnum.Ok, MsbIcon.Warning).ShowAsync();
     }
 
     public void Dispose()
@@ -137,7 +143,7 @@ public sealed class TrayIconHost : IDisposable
         if (_disposed) return;
         _disposed = true;
         _settings.OnRunningChanged -= UpdateToggleLabel;
-        _icon.Visible = false;
+        _icon.IsVisible = false;
         _icon.Dispose();
     }
 }

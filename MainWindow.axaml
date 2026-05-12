@@ -1,0 +1,183 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Babelive.MainWindow"
+        Title="Babelive — Realtime Audio Translator"
+        Width="900" Height="640" MinWidth="700" MinHeight="460"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="36"
+        FontFamily="Microsoft YaHei UI, Segoe UI, PingFang SC"
+        FontSize="13">
+
+  <!-- Outer rounded shell -->
+  <Border Background="{StaticResource WindowBg}"
+          BorderBrush="{StaticResource WindowBorder}"
+          BorderThickness="1"
+          CornerRadius="12">
+    <Grid RowDefinitions="36,*">
+
+      <!-- ===== Title bar (drag region) ===== -->
+      <Grid Grid.Row="0" Background="Transparent"
+            x:Name="TitleBar"
+            PointerPressed="TitleBar_PointerPressed"
+            ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="Babelive"
+                   FontSize="13" FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   Margin="20,0,0,0"
+                   Foreground="{StaticResource TextSecondary}"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button Classes="caption" Content="—"
+                  Click="MinBtn_Click"
+                  ToolTip.Tip="Minimize"/>
+          <Button Classes="caption close" Content="✕"
+                  Click="CloseBtn_Click"
+                  ToolTip.Tip="Close (overlay stays in tray)"/>
+        </StackPanel>
+      </Grid>
+
+      <!-- ===== Main content ===== -->
+      <Grid Grid.Row="1" Margin="24,4,24,20"
+            RowDefinitions="Auto,Auto,*">
+
+        <!-- Top control panel: 3 columns -->
+        <Grid Grid.Row="0"
+              ColumnDefinitions="120,*,Auto"
+              RowDefinitions="Auto,Auto,Auto,Auto">
+
+          <TextBlock Text="Translate to" Grid.Row="0" Grid.Column="0"
+                     Classes="label" Margin="0,8"/>
+          <ComboBox x:Name="LangCombo" Grid.Row="0" Grid.Column="1"
+                    HorizontalAlignment="Stretch" Margin="6,4"/>
+
+          <TextBlock Text="Capture source" Grid.Row="1" Grid.Column="0"
+                     Classes="label" Margin="0,8"/>
+          <Grid Grid.Row="1" Grid.Column="1" Margin="6,4"
+                ColumnDefinitions="*,Auto">
+            <ComboBox x:Name="CaptureCombo" Grid.Column="0"
+                      HorizontalAlignment="Stretch"
+                      ToolTip.Tip="'All system audio (no echo)' uses the Win10 20348+ Process Loopback API to exclude this app from capture — recommended; lets you use the same physical device for capture and playback. The other 'Loopback: …' entries use legacy device loopback (will echo if same device as playback)."/>
+            <Button x:Name="RefreshCaptureBtn" Grid.Column="1"
+                    Classes="icon" Content="↻" Margin="6,0,0,0"
+                    ToolTip.Tip="Refresh — re-detect running processes and audio devices."
+                    Click="RefreshCaptureBtn_Click"/>
+          </Grid>
+
+          <TextBlock Text="Playback device" Grid.Row="2" Grid.Column="0"
+                     Classes="label" Margin="0,8"/>
+          <Grid Grid.Row="2" Grid.Column="1" Margin="6,4"
+                ColumnDefinitions="*,Auto">
+            <ComboBox x:Name="PlayCombo" Grid.Column="0"
+                      HorizontalAlignment="Stretch"/>
+            <Button x:Name="RefreshPlaybackBtn" Grid.Column="1"
+                    Classes="icon" Content="↻" Margin="6,0,0,0"
+                    ToolTip.Tip="Refresh — re-enumerate render devices (e.g. after Bluetooth reconnects or you plug in headphones)."
+                    Click="RefreshPlaybackBtn_Click"/>
+          </Grid>
+
+          <WrapPanel Grid.Row="3" Grid.Column="1" Margin="6,10,6,4">
+            <CheckBox x:Name="MuteCheck"
+                      Content="Transcript only" Margin="0,4,20,4"/>
+            <CheckBox x:Name="AltUrlCheck"
+                      Content="Alt endpoint" Margin="0,4,20,4"/>
+            <CheckBox x:Name="EchoSuppressCheck"
+                      Content="Echo suppress" Margin="0,4,20,4"
+                      ToolTip.Tip="Silences input to API while translation is playing. Prevents echo loops but the model may stall after a few seconds of silence."/>
+            <CheckBox x:Name="MuteOtherDevicesCheck"
+                      Content="Mute other speakers" Margin="0,4,20,4"
+                      ToolTip.Tip="Translation-only listening, with no manual audio config: (1) switches the Windows default render device if needed, (2) mutes every other render endpoint. Both reverted on Stop."/>
+            <CheckBox x:Name="DuckCheck"
+                      IsChecked="True"
+                      Content="Duck source to" Margin="0,4,8,4"
+                      Click="DuckCheck_Toggled"
+                      ToolTip.Tip="Lower other apps' session volumes while translation plays. Slider is clamped to ≥5% — at 0% the API would lose source signal and translation would stop."/>
+            <TextBlock VerticalAlignment="Center" MinWidth="40" Margin="0,4,8,4"
+                       Foreground="{StaticResource Accent}"
+                       FontWeight="SemiBold"
+                       Text="{Binding #DuckSlider.Value, StringFormat={}{0:F0}%}"/>
+            <Slider x:Name="DuckSlider"
+                    Minimum="5" Maximum="80" Value="5"
+                    Width="130" SmallChange="5"
+                    TickFrequency="5" IsSnapToTickEnabled="True"
+                    Margin="0,4,0,4"
+                    ValueChanged="DuckSlider_ValueChanged"
+                    ToolTip.Tip="Volume kept for source apps while translation plays. Min is 5% — 0% would mute API input and stop translation."/>
+          </WrapPanel>
+
+          <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="4"
+                      Orientation="Vertical" Margin="20,4,0,4"
+                      VerticalAlignment="Center">
+            <Button x:Name="StartBtn" Classes="primary"
+                    Content="Start" Width="130" Height="44"
+                    Margin="0,0,0,8" Click="StartBtn_Click"/>
+            <Button x:Name="ClearBtn" Classes="flat"
+                    Content="Clear text" Width="130" Height="34"
+                    Click="ClearBtn_Click"/>
+            <Button x:Name="ApiBtn" Classes="flat"
+                    Content="API…" Width="130" Height="32"
+                    Margin="0,8,0,0"
+                    Click="ApiBtn_Click"
+                    ToolTip.Tip="Configure the API endpoint and key (supports reverse-proxy hosts)"/>
+          </StackPanel>
+        </Grid>
+
+        <!-- ===== Status row ===== -->
+        <DockPanel Grid.Row="1" Margin="2,16,2,10">
+          <TextBlock Text="Status" Classes="label"
+                     Foreground="{StaticResource TextMuted}"
+                     FontSize="11" FontWeight="SemiBold"/>
+          <TextBlock x:Name="StatusText" Text="idle"
+                     Foreground="{StaticResource Accent}"
+                     Margin="10,0,0,0"
+                     VerticalAlignment="Center"
+                     FontSize="11" FontWeight="SemiBold"/>
+        </DockPanel>
+
+        <!-- ===== Transcripts ===== -->
+        <Grid Grid.Row="2" RowDefinitions="*,8,2*">
+
+          <!-- Source (heard) -->
+          <Grid Grid.Row="0" RowDefinitions="Auto,*">
+            <TextBlock Grid.Row="0" Text="SOURCE (HEARD)" Classes="section"/>
+            <Border Grid.Row="1"
+                    Background="{StaticResource ContentBg}"
+                    BorderBrush="{StaticResource ControlBorder}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+              <TextBox x:Name="SourceText"
+                       Classes="transcript"
+                       TextWrapping="Wrap"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       FontSize="12"
+                       Foreground="{StaticResource TextSecondary}"/>
+            </Border>
+          </Grid>
+
+          <GridSplitter Grid.Row="1" ResizeBehavior="PreviousAndNext"
+                        ResizeDirection="Rows"/>
+
+          <!-- Translation -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <TextBlock Grid.Row="0" Text="TRANSLATION" Classes="section"/>
+            <Border Grid.Row="1"
+                    Background="{StaticResource ContentBg}"
+                    BorderBrush="{StaticResource ControlBorder}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+              <TextBox x:Name="TargetText"
+                       Classes="transcript"
+                       TextWrapping="Wrap"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       FontSize="14"/>
+            </Border>
+          </Grid>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

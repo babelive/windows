@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Babelive.ApiSettingsWindow"
+        Title="API Settings"
+        Width="580" Height="420"
+        MinWidth="480" MinHeight="340"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="36"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="Microsoft YaHei UI, Segoe UI, PingFang SC"
+        FontSize="13">
+
+  <Border Background="{StaticResource WindowBg}"
+          BorderBrush="{StaticResource WindowBorder}"
+          BorderThickness="1"
+          CornerRadius="12">
+    <Grid RowDefinitions="36,*">
+
+      <!-- Title bar (drag region) -->
+      <Grid Grid.Row="0" Background="Transparent"
+            PointerPressed="TitleBar_PointerPressed"
+            ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="API Settings"
+                   FontSize="13" FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   Margin="20,0,0,0"
+                   Foreground="{StaticResource TextSecondary}"/>
+        <Button Grid.Column="1"
+                Classes="caption close" Content="✕"
+                Click="CancelBtn_Click"
+                ToolTip.Tip="Cancel"/>
+      </Grid>
+
+      <!-- Form content -->
+      <Grid Grid.Row="1" Margin="28,12,28,24"
+            RowDefinitions="Auto,Auto,Auto,22,Auto,Auto,Auto,*,Auto">
+
+        <TextBlock Grid.Row="0" Text="API ENDPOINT" Classes="section"/>
+        <TextBox  Grid.Row="1" x:Name="BaseUrlBox"
+                  Classes="input"
+                  Margin="0,2,0,0"
+                  FontFamily="Consolas, Microsoft YaHei UI"/>
+        <TextBlock Grid.Row="2"
+                   Classes="helper"
+                   Text="Default is OpenAI's official endpoint. Accepts ws://, wss://, http://, https:// — http/s is auto-converted. For reverse-proxy setups, include any path prefix, e.g. https://my-proxy.example.com/openai."/>
+
+        <TextBlock Grid.Row="4" Text="API KEY" Classes="section"/>
+        <TextBox  Grid.Row="5" x:Name="ApiKeyBox"
+                  Classes="input"
+                  Margin="0,2,0,0"
+                  FontFamily="Consolas, Microsoft YaHei UI"/>
+        <TextBlock Grid.Row="6"
+                   Classes="helper"
+                   Text="Required to start translation. Stored locally in %APPDATA%\Babelive\settings.json (plain JSON, no encryption — same trust model as the rest of your local profile)."/>
+
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Classes="flat"
+                  Content="Cancel" Width="100" Height="34"
+                  Margin="0,0,8,0"
+                  Click="CancelBtn_Click"
+                  IsCancel="True"/>
+          <Button Classes="primary"
+                  Content="Save" Width="100" Height="34"
+                  Click="SaveBtn_Click"
+                  IsDefault="True"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

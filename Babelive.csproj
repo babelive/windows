@@ -1,35 +1,33 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Keep -windows TFM: Audio/ and COM-interop code is hard-Windows.
+         When the macOS port lands, swap to net9.0 + platform-guard the
+         audio layer behind an interface. -->
+    <TargetFramework>net9.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Babelive</RootNamespace>
     <AssemblyName>Babelive</AssemblyName>
     <ApplicationIcon></ApplicationIcon>
-    <!-- Tell `dotnet restore` to fetch win-x64 NuGet assets too, so a
-         later publish step (with no-restore flag) that sets
-         RuntimeIdentifier=win-x64 via the conditional Release group
-         below can resolve them from the existing project.assets.json
-         instead of erroring with NETSDK1047. The plural Identifiers
-         here is for restore; the singular Identifier in the Release
-         group is the one actually used at publish time. -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <!-- See Release-publish group below for the singular RuntimeIdentifier;
+         this plural form lets `dotnet restore` fetch the win-x64 NuGet
+         assets in one pass for the no-restore publish step. -->
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- Avalonia recommends explicit XAML compilation. -->
+    <AvaloniaXamlIlDebuggerLaunch>false</AvaloniaXamlIlDebuggerLaunch>
   </PropertyGroup>
 
   <!-- Release-publish defaults: produce ONE self-contained, compressed
-       Babelive.exe (~68 MB) with no sidecar DLLs and no .pdb. Scoped to
-       Release so Debug builds (dotnet build / dotnet run) are unaffected
-       and still produce normal multi-file output with full symbols. -->
+       Babelive.exe (~75-90 MB with Avalonia + Skia natives bundled).
+       Scoped to Release so Debug builds (dotnet build / dotnet run) are
+       unaffected and still produce normal multi-file output. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <!-- Bundle native WPF/CRT DLLs (D3DCompiler, wpfgfx_cor3, …) inside
-         the exe; .NET will self-extract them to %TEMP%\.net\… on launch. -->
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>none</DebugType>
@@ -37,7 +35,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- Avalonia 12 — released April 2026, latest 12.0.3 (May 2026). -->
+    <PackageReference Include="Avalonia"               Version="12.0.3" />
+    <PackageReference Include="Avalonia.Desktop"       Version="12.0.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter"   Version="12.0.3" />
+    <!-- WPF's MessageBox isn't in Avalonia; this is the de-facto port.
+         Package id is MessageBox.Avalonia; namespace is MsBox.Avalonia. -->
+    <PackageReference Include="MessageBox.Avalonia"    Version="12.0.0" />
+
+    <!-- Audio stack — still Windows-only; will get a macOS sibling later. -->
+    <PackageReference Include="NAudio"                 Version="2.2.1" />
   </ItemGroup>
 
 </Project>

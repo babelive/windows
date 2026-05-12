@@ -1,0 +1,230 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Babelive.LyricWindow"
+        Title="Babelive Lyrics"
+        WindowDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False"
+        Width="1100" Height="120"
+        MinWidth="400" MinHeight="80"
+        MaxWidth="3000" MaxHeight="400"
+        WindowStartupLocation="Manual"
+        FontFamily="Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI">
+
+  <Window.Resources>
+    <!-- Warm "TTPlayer/Kugou" gradient: white top → cream → amber. -->
+    <LinearGradientBrush x:Key="TranslationGradient" StartPoint="50%,0%" EndPoint="50%,100%">
+      <GradientStop Offset="0.0"  Color="#FFFFFFFF"/>
+      <GradientStop Offset="0.55" Color="#FFFFE9A8"/>
+      <GradientStop Offset="1.0"  Color="#FFFFB938"/>
+    </LinearGradientBrush>
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="Button.toolbar">
+      <Setter Property="Width" Value="28"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="Margin" Value="2,0"/>
+      <Setter Property="Background" Value="#33FFFFFF"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="#FFE0E0E0"/>
+      <Setter Property="FontFamily" Value="Segoe UI, Segoe UI Symbol, Microsoft YaHei UI"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Bd" Background="{TemplateBinding Background}"
+                  CornerRadius="4">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Content="{TemplateBinding Content}"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.toolbar:pointerover /template/ Border#Bd">
+      <Setter Property="Background" Value="#66FFFFFF"/>
+    </Style>
+    <Style Selector="Button.toolbar:pointerover">
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.toolbar:pressed /template/ Border#Bd">
+      <Setter Property="Background" Value="#88FFFFFF"/>
+    </Style>
+  </Window.Styles>
+
+  <!-- Outer transparent grid still receives clicks/drag (1/255 alpha fill). -->
+  <Grid x:Name="RootGrid" Background="#01000000"
+        PointerPressed="Window_PointerPressed"
+        PointerMoved="Window_PointerMoved"
+        PointerReleased="Window_PointerReleased"
+        PointerEntered="Window_PointerEntered"
+        PointerExited="Window_PointerExited">
+
+    <!-- Always-on translucent backdrop. -->
+    <Border x:Name="AmbientFrame"
+            Background="#882A2A2A"
+            BorderBrush="#22FFFFFF"
+            BorderThickness="1"
+            CornerRadius="12"
+            Margin="6"
+            IsHitTestVisible="False"/>
+    <!-- Hover boost: fades in on pointer-over. -->
+    <Border x:Name="HoverFrame"
+            Background="#66000000"
+            BorderBrush="#55FFFFFF"
+            BorderThickness="1"
+            CornerRadius="12"
+            Margin="6"
+            Opacity="0"
+            IsHitTestVisible="False">
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.28"/>
+        </Transitions>
+      </Border.Transitions>
+    </Border>
+
+    <!-- Lyric stack centered in the window. -->
+    <StackPanel VerticalAlignment="Center" Margin="16,4,16,4">
+
+      <!-- Source line — ice-blue, brighter. -->
+      <Viewbox StretchDirection="DownOnly" Stretch="Uniform" Margin="0,0,0,8" MaxHeight="28">
+        <TextBlock x:Name="SourceText"
+                   FontSize="18" FontWeight="SemiBold"
+                   Foreground="#FFEFF8FF"
+                   Opacity="0.95"
+                   TextWrapping="NoWrap"
+                   TextTrimming="CharacterEllipsis"
+                   HorizontalAlignment="Center"
+                   Text="">
+          <TextBlock.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="14" OffsetX="0" OffsetY="0" Opacity="1"/>
+          </TextBlock.Effect>
+        </TextBlock>
+      </Viewbox>
+
+      <!-- Translation line — gradient fill + faux outline via 4 black copies + glow. -->
+      <Viewbox StretchDirection="DownOnly" Stretch="Uniform" MaxHeight="56">
+        <Grid>
+          <!-- Outer halo -->
+          <TextBlock FontSize="{Binding #TranslationText.FontSize}"
+                     FontWeight="Bold"
+                     Foreground="#FF000000"
+                     Text="{Binding #TranslationText.Text}"
+                     HorizontalAlignment="Center"
+                     TextWrapping="NoWrap">
+            <TextBlock.Effect>
+              <DropShadowEffect Color="Black" BlurRadius="22" OffsetX="0" OffsetY="0" Opacity="1"/>
+            </TextBlock.Effect>
+          </TextBlock>
+
+          <!-- 4-direction stacked stroke (±1.5 px). -->
+          <TextBlock FontSize="{Binding #TranslationText.FontSize}"
+                     FontWeight="Bold" Foreground="#FF000000"
+                     Text="{Binding #TranslationText.Text}"
+                     Margin="-1.5,0,1.5,0"
+                     HorizontalAlignment="Center" TextWrapping="NoWrap"/>
+          <TextBlock FontSize="{Binding #TranslationText.FontSize}"
+                     FontWeight="Bold" Foreground="#FF000000"
+                     Text="{Binding #TranslationText.Text}"
+                     Margin="1.5,0,-1.5,0"
+                     HorizontalAlignment="Center" TextWrapping="NoWrap"/>
+          <TextBlock FontSize="{Binding #TranslationText.FontSize}"
+                     FontWeight="Bold" Foreground="#FF000000"
+                     Text="{Binding #TranslationText.Text}"
+                     Margin="0,-1.5,0,1.5"
+                     HorizontalAlignment="Center" TextWrapping="NoWrap"/>
+          <TextBlock FontSize="{Binding #TranslationText.FontSize}"
+                     FontWeight="Bold" Foreground="#FF000000"
+                     Text="{Binding #TranslationText.Text}"
+                     Margin="0,1.5,0,-1.5"
+                     HorizontalAlignment="Center" TextWrapping="NoWrap"/>
+
+          <!-- Foreground gradient. -->
+          <TextBlock x:Name="TranslationText"
+                     FontSize="34" FontWeight="Bold"
+                     Foreground="{StaticResource TranslationGradient}"
+                     TextWrapping="NoWrap"
+                     HorizontalAlignment="Center"
+                     Text="Babelive — hover for controls, click ⚙ to configure">
+            <TextBlock.Effect>
+              <DropShadowEffect Color="Black" BlurRadius="10" OffsetX="0" OffsetY="0" Opacity="0.95"/>
+            </TextBlock.Effect>
+          </TextBlock>
+        </Grid>
+      </Viewbox>
+    </StackPanel>
+
+    <!-- Top-right toolbar (fades in on hover, overlays the lyric area) -->
+    <Border x:Name="Toolbar"
+            HorizontalAlignment="Right" VerticalAlignment="Top"
+            Margin="0,8,12,0"
+            Opacity="0">
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+        </Transitions>
+      </Border.Transitions>
+      <StackPanel Orientation="Horizontal">
+        <Button x:Name="ToggleBtn" Classes="toolbar"
+                Width="64" Content="▶ Start" FontSize="11"
+                Click="ToggleBtn_Click"
+                ToolTip.Tip="Start / stop translation"/>
+        <Button x:Name="FontMinusBtn" Classes="toolbar"
+                Content="A−" FontSize="12"
+                Click="FontMinusBtn_Click"
+                ToolTip.Tip="Decrease translation font size"/>
+        <Button x:Name="FontPlusBtn" Classes="toolbar"
+                Content="A+" FontSize="12"
+                Click="FontPlusBtn_Click"
+                ToolTip.Tip="Increase translation font size"/>
+        <Button x:Name="VolDownBtn" Classes="toolbar"
+                Content="&#x1F509;" FontSize="14"
+                FontFamily="Segoe UI Emoji, Segoe UI Symbol"
+                Click="VolDownBtn_Click"
+                ToolTip.Tip="Decrease translation playback volume"/>
+        <Button x:Name="VolUpBtn" Classes="toolbar"
+                Content="&#x1F50A;" FontSize="14"
+                FontFamily="Segoe UI Emoji, Segoe UI Symbol"
+                Click="VolUpBtn_Click"
+                ToolTip.Tip="Increase translation playback volume"/>
+        <Button x:Name="SettingsBtn" Classes="toolbar"
+                Content="&#x2699;" FontSize="14"
+                Click="SettingsBtn_Click"
+                ToolTip.Tip="Settings…"/>
+        <Button x:Name="HideBtn" Classes="toolbar"
+                Content="&#x2715;" FontSize="11"
+                Click="HideBtn_Click"
+                ToolTip.Tip="Hide overlay (re-open from tray)"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Bottom-right resize grip. Avalonia's BeginResizeDrag handles the
+         actual resize even on transparent windows (unlike WPF). -->
+    <Border x:Name="ResizeGrip"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            Margin="0,0,8,8"
+            Width="24" Height="24"
+            Background="#01000000"
+            Cursor="BottomRightCorner"
+            Opacity="0.4"
+            PointerPressed="ResizeGrip_PointerPressed">
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+        </Transitions>
+      </Border.Transitions>
+      <Path Stroke="#FFFFFFFF"
+            StrokeThickness="1.5"
+            StrokeLineCap="Round"
+            Width="12" Height="12"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            IsHitTestVisible="False"
+            Data="M 1,11 L 11,1  M 5,11 L 11,5  M 9,11 L 11,9"/>
+    </Border>
+  </Grid>
+</Window>
